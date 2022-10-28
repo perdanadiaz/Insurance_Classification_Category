@@ -1,0 +1,121 @@
+#Import Libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+#Import Dataset
+sheet_url = 'https://docs.google.com/spreadsheets/d/1HPym0j51FR8Kd5Q_kT2oWK7jWyFVl5BbPpeTM0rWWPM/edit#gid=810249112'
+sheet_url_trf = sheet_url.replace('/edit#gid=', '/export?format=csv&gid=')
+dataset = pd.read_csv(sheet_url_trf)
+dataset
+dataset.info()
+
+#Checking Descriptive Statistics
+dataset.describe()
+
+#Checking Null Value
+dataset.isnull().sum()
+
+#Drop Null Value
+dataset = dataset.dropna(axis = 0, inplace = True)
+dataset.isnull().sum()
+
+#Outlier Detection
+##Plafond Kredit (Criteria : Plafond Kredit > 500.000.000)
+import seaborn as sns
+sns.boxplot(dataset['plafon_kredit'])
+
+import numpy as np
+print(np.where(dataset['plafon_kredit']>500000000))
+
+##Jangka Waktu Penjaminan (Criteria : Jangka Waktu > 60 bulan)
+import seaborn as sns
+sns.boxplot(dataset['jangka_waktu'])
+import numpy as np
+print(np.where(dataset['jangka_waktu']>60))
+
+#From above criteria, there is no outlier
+
+#Encoding Categorical Value
+on_jenis_kredit_bank = pd.get_dummies(dataset['jenis_kredit_bank'], prefix='jenis_kredit_bank')
+on_jenis_kur_bank = pd.get_dummies(dataset['jenis_kur_bank'], prefix='jenis_kur_bank')
+on_jenis_kelamin = pd.get_dummies(dataset['jenis_kelamin'], prefix='jenis_kelamin')
+on_sector_desc = pd.get_dummies(dataset['sector_desc'], prefix='sector_desc')
+on_jenis_agunan = pd.get_dummies(dataset['jenis_agunan'], prefix='jenis_agunan')
+on_kode_uker = pd.get_dummies(dataset['kode_uker'], prefix='kode_uker')
+
+#Merge Encoding Categorical and Current Dataframe then decide independent and dependent variable
+# Define class and feature
+X = pd.concat([on_jenis_kredit_bank, on_jenis_kur_bank, on_jenis_kelamin, on_sector_desc, on_jenis_agunan, on_kode_uker, dataset['jangka_waktu'],
+               dataset['plafon_kredit'],dataset['modal_usaha'], dataset['nilai_agunan'],dataset['jml_t_kerja']], axis = 1)
+Y = dataset['is_claim']
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size= 0.2, random_state=0)
+
+#Prediction Before SMOTE.
+#1st Method using Random Forest
+from sklearn.ensemble import RandomForestClassifier
+# instantiate the classifier 
+rfc = RandomForestClassifier(random_state=0)
+# fit the model
+rfc.fit(X_train, y_train)
+# Predict the Test set results
+y_pred = rfc.predict(X_test)
+# Check accuracy score 
+from sklearn.metrics import accuracy_score
+print('Model accuracy score with 10 decision-trees : {0:0.4f}'. format(accuracy_score(y_test, y_pred)))
+#Model accuracy score with 10 decision-trees : 0.9592
+
+clf = RandomForestClassifier(n_estimators=100, random_state=0)
+# fit the model to the training set
+clf.fit(X_train, y_train)
+
+from sklearn.metrics import confusion_matrix
+
+cm = confusion_matrix(y_test, y_pred)
+
+print('Confusion matrix\n\n', cm)
+#Get Confussion Matrix True Positive = 18974 and True Negative = 199
+from sklearn.metrics import accuracy_score, precision_score, f1_score
+print(accuracy_score(y_test, y_pred))
+print(precision_score(y_test, y_pred))
+print(f1_score(y_test, y_pred))
+
+#2nd Method use Decision Tree
+# import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier
+# instantiate the DecisionTreeClassifier model with criterion entropy
+clf_en = DecisionTreeClassifier(criterion='entropy', max_depth=3, random_state=0)
+# fit the model
+clf_en.fit(X_train, y_train)
+y_pred_en = clf_en.predict(X_test)
+from sklearn.metrics import accuracy_score
+
+print('Model accuracy score with criterion entropy: {0:0.4f}'. format(accuracy_score(y_test, y_pred_en)))
+y_pred_train_en = clf_en.predict(X_train)
+
+y_pred_train_en
+print('Training-set accuracy score: {0:0.4f}'. format(accuracy_score(y_train, y_pred_train_en)))
+# print the scores on training and test set
+
+print('Training set score: {:.4f}'.format(clf_en.score(X_train, y_train)))
+
+print('Test set score: {:.4f}'.format(clf_en.score(X_test, y_test)))
+
+# Print the Confusion Matrix and slice it into four pieces
+
+from sklearn.metrics import confusion_matrix
+
+cm = confusion_matrix(y_test, y_pred_en)
+
+print('Confusion matrix\n\n', cm)
+from sklearn.metrics import classification_report
+
+print(classification_report(y_test, y_pred_en))
+plt.figure(figsize=(20,12))
+
+from sklearn import tree
+
+tree.plot_tree(clf_en.fit(X_train, y_train)) 
